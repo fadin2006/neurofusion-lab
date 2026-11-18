@@ -31,14 +31,21 @@ header h1{font-family:var(--f-display);font-size:1.7rem;margin:0;text-wrap:balan
 header p{margin:4px 0 0;color:var(--muted);max-width:70ch}
 .banner{background:var(--accent-soft);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:.88rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:18px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:12px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:12px;min-width:0;align-content:start}
 .panel h2{font-family:var(--f-display);font-size:1.05rem;margin:0;display:flex;gap:8px;align-items:center}
 .step{font-family:var(--f-mono);font-size:.72rem;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:1px 6px;letter-spacing:.04em}
 label{font-size:.82rem;color:var(--muted);display:grid;gap:4px}
 input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;box-sizing:border-box}
 textarea{min-height:92px;resize:vertical}
 input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:stretch}
+.row>label{align-content:end}
+#bloodIn{grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px 12px}
+#bloodIn input{font-family:var(--f-mono);text-align:right}
+#bloodTbl td:nth-child(2),#bloodTbl th:nth-child(2){text-align:right;font-family:var(--f-mono)}
+#bloodTbl td:nth-child(3){font-family:var(--f-mono);font-size:.8rem;color:var(--muted);white-space:nowrap}
+#bloodTbl td:nth-child(4){white-space:nowrap}
+.flag{display:inline-block;min-width:4.5em;text-align:center}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .seg button,.btn{font:inherit;font-size:.85rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:6px 12px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -564,7 +571,7 @@ const BLOOD=[
  {id:'cdt',name:'CDT',unit:'%',lo:0,hi:1.7,val:2.1,link:'Recent heavy drinking'},
  {id:'peth',name:'PEth',unit:'µmol/L',lo:0,hi:0.05,val:0.18,link:'Alcohol intake, 2–4 weeks'},
  {id:'crp',name:'hs-CRP',unit:'mg/L',lo:0,hi:3,val:2.4,link:'Inflammation'},
- {id:'cort',name:'Cortisol (am)',unit:'nmol/L',lo:140,hi:690,val:520,link:'Stress axis'},
+ {id:'cort',name:'Cortisol, am',unit:'nmol/L',lo:140,hi:690,val:520,link:'Stress axis'},
  {id:'b12',name:'Vitamin B12',unit:'pmol/L',lo:150,hi:700,val:210,link:'Cognition, neuropathy'}
 ];
 function buildBlood(){
