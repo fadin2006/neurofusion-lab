@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Research prototype on synthetic data: combining clinician ratings, fMRI, EEG and blood markers into one risk profile, with trial assessment. Not a medical device.">
+</head>
+<body>
+<title>NeuroFusion Diagnostic Lab</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@500;600;700&display=swap">
+<style>
+/* Layout: clinical workstation — input column (doctor, fMRI, EEG, blood) feeding one fusion report */
+:root{
+  --bg:#f4f6f8; --panel:#ffffff; --ink:#15202b; --muted:#5b6b7a; --line:#d9e1e8;
+  --accent:#0f6e8c; --accent-soft:#e2f1f6;
+  --ok:#2f8a4e; --warn:#c98a10; --bad:#c23b3b;
+  --scan-bg:#0b1016;
+  --f-display:"Sora","Segoe UI",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e141a; --panel:#151d25; --ink:#e3eaf0; --muted:#93a4b3; --line:#26323d;
+  --accent:#4fb3d3; --accent-soft:#16303b; --ok:#5cc07c; --warn:#e3a93a; --bad:#ef6a6a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141a; --panel:#151d25; --ink:#e3eaf0; --muted:#93a4b3; --line:#26323d;
+  --accent:#4fb3d3; --accent-soft:#16303b; --ok:#5cc07c; --warn:#e3a93a; --bad:#ef6a6a; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:18px}
+header h1{font-family:var(--f-display);font-size:1.7rem;margin:0;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted);max-width:70ch}
+.banner{background:var(--accent-soft);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:.88rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:12px;min-width:0}
+.panel h2{font-family:var(--f-display);font-size:1.05rem;margin:0;display:flex;gap:8px;align-items:center}
+.step{font-family:var(--f-mono);font-size:.72rem;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:1px 6px;letter-spacing:.04em}
+label{font-size:.82rem;color:var(--muted);display:grid;gap:4px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;box-sizing:border-box}
+textarea{min-height:92px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button,.btn{font:inherit;font-size:.85rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+canvas{width:100%;height:auto;display:block;border-radius:8px;background:var(--scan-bg)}
+.scanwrap{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:12px}
+@media (max-width:640px){.scanwrap{grid-template-columns:1fr}}
+.legend{font-size:.8rem;display:grid;gap:6px;align-content:start}
+.swatch{display:inline-block;width:28px;height:10px;border-radius:2px;vertical-align:middle;margin-right:6px}
+table{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:500}
+.tblwrap{overflow-x:auto}
+.flag{font-family:var(--f-mono);font-size:.75rem;padding:1px 6px;border-radius:4px;border:1px solid currentColor}
+.f-ok{color:var(--ok)} .f-warn{color:var(--warn)} .f-bad{color:var(--bad)}
+.report{border-left:5px solid var(--accent)}
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.cell{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:2px}
+.cell .k{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.cell .v{font-family:var(--f-display);font-size:1.15rem;font-weight:600}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar span{display:block;height:100%;background:var(--accent)}
+.contrib{display:grid;grid-template-columns:110px minmax(0,1fr) 44px;gap:8px;align-items:center;font-size:.84rem}
+ul.find{margin:0;padding-left:18px;display:grid;gap:3px;font-size:.9rem}
+.small{font-size:.8rem;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:.78rem;border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+a{color:var(--accent)}
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px;font-size:.86rem}
+.res div{border:1px solid var(--line);border-radius:8px;padding:10px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>NeuroFusion Diagnostic Lab</h1>
+  <p>Combine a doctor's notes, an fMRI slice, EEG and blood markers into one structured result: is there a problem, which brain areas, one area or several, and how severe.</p>
+</header>
+<div class="banner"><strong>Research prototype with simulated data.</strong> The fMRI images, EEG traces and scoring rules are synthetic and transparent. This is not a medical device and must not be used for diagnosis.</div>
+
+<div class="grid">
+  <section class="panel" aria-labelledby="h-dr">
+    <h2 id="h-dr"><span class="step">1</span> Doctor's assessment</h2>
+    <div class="row">
+      <label>Patient ID<input id="pid" value="SIM-0427"></label>
+      <label>Age<input id="age" type="number" min="10" max="99" value="15"></label>
+      <label>Sex<select id="sex"><option>Female</option><option selected>Male</option></select></label>
+    </div>
+    <label>Clinical notes<textarea id="notes">15-year-old referred after repeated weekend binge drinking. Reports low mood, poor concentration at school and impulsive decisions. Two episodes of blackout in the last month. No seizure history.</textarea></label>
+    <div class="row">
+      <label>AUDIT (0–40)<input id="audit" type="number" min="0" max="40" value="14"></label>
+      <label>PHQ-9 (0–27)<input id="phq" type="number" min="0" max="27" value="11"></label>
+      <label>GAD-7 (0–21)<input id="gad" type="number" min="0" max="21" value="8"></label>
+      <label>Impulsivity BIS-11 (30–120)<input id="bis" type="number" min="30" max="120" value="78"></label>
+    </div>
+    <div class="small">Traits found in notes: <span id="traits" class="chips"></span></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-mri">
+    <h2 id="h-mri"><span class="step">2</span> fMRI (axial slice, task activation)</h2>
+    <div class="seg" role="group" aria-label="fMRI case">
+      <button data-mri="healthy" aria-pressed="false">Healthy</button>
+      <button data-mri="mild" aria-pressed="true">Mild problem</button>
+      <button data-mri="severe" aria-pressed="false">Severe problem</button>
+    </div>
+    <div class="scanwrap">
+      <canvas id="mri" width="520" height="520" aria-label="Simulated fMRI slice"></canvas>
+      <div class="legend">
+        <div><span class="swatch" style="background:linear-gradient(90deg,#ffd23f,#ff5a1f)"></span>Hyper-activation</div>
+        <div><span class="swatch" style="background:linear-gradient(90deg,#3fb6ff,#2a4bff)"></span>Hypo-activation</div>
+        <div class="small">Z-score vs. age-matched healthy norm. Areas with |z| ≥ 2.3 count as abnormal.</div>
+        <div class="tblwrap"><table id="mriTbl"><thead><tr><th>Area</th><th>z</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-eeg">
+    <h2 id="h-eeg"><span class="step">3</span> EEG (8–32 channels, 10–20 system) <span class="small" id="eegInfo"></span></h2>
+    <div class="seg" role="group" aria-label="EEG source">
+      <button data-src="dummy" aria-pressed="true">Dummy data</button>
+      <button data-src="file" aria-pressed="false">File (offline)</button>
+      <button data-src="live" aria-pressed="false">Live device</button>
+    </div>
+    <div class="seg" id="srcDummy" role="group" aria-label="EEG case">
+      <button data-eeg="healthy" aria-pressed="false">Normal</button>
+      <button data-eeg="mild" aria-pressed="true">Mild slowing</button>
+      <button data-eeg="severe" aria-pressed="false">Severe + spikes</button>
+      <label style="display:flex;gap:6px;align-items:center">Channels<select id="nCh" style="width:auto"><option value="8">8</option><option value="16" selected>16</option><option value="32">32</option></select></label>
+      <button class="btn" id="regen" type="button">New random sample</button>
+    </div>
+    <div id="srcFile" class="row" hidden>
+      <label>EEG file (CSV or TXT: one column per channel; optional "time" and "event" columns)<input type="file" id="eegFile" accept=".csv,.txt,.tsv"></label>
+      <label>Sampling rate (Hz)<input id="fileFs" type="number" min="32" max="4096" value="256"></label>
+      <div class="small" id="fileMsg">No file loaded. Export from OpenBCI GUI, Muse/Mind Monitor, BrainVision or MNE as CSV.</div>
+    </div>
+    <div id="srcLive" hidden style="display:grid;gap:8px">
+      <div class="seg">
+        <button class="btn" id="btMuse" type="button">Connect Muse (Bluetooth)</button>
+        <button class="btn" id="btSerial" type="button">Connect serial EEG (OpenBCI / Arduino)</button>
+        <button class="btn" id="btStop" type="button">Stop</button>
+      </div>
+      <div class="row"><label>Serial sampling rate (Hz)<input id="serFs" type="number" value="250"></label><label>Serial baud rate<input id="serBaud" type="number" value="115200"></label></div>
+      <div class="small" id="liveMsg"></div>
+    </div>
+    <canvas id="eeg" width="1000" height="520" aria-label="Simulated EEG traces"></canvas>
+    <div class="tblwrap"><table id="eegTbl"><thead><tr><th>Ch</th><th>Delta %</th><th>Theta %</th><th>Alpha %</th><th>Beta %</th><th>θ/β</th><th>Spikes</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-blood">
+    <h2 id="h-blood"><span class="step">4</span> Blood markers</h2>
+    <div class="row" id="bloodIn"></div>
+    <div class="tblwrap"><table id="bloodTbl"><thead><tr><th>Marker</th><th>Value</th><th>Reference</th><th>Flag</th><th>Linked to</th></tr></thead><tbody></tbody></table></div>
+  </section>
+</div>
+
+<section class="panel" aria-labelledby="h-trial">
+  <h2 id="h-trial"><span class="step">3b</span> EEG trial assessment and accuracy</h2>
+  <div class="row">
+    <label>Paradigm<select id="paradigm">
+      <option value="oddball">Auditory oddball (P300)</option>
+      <option value="gonogo" selected>Go/No-Go (inhibition: N2/P3)</option>
+      <option value="cue">Alcohol cue reactivity (LPP)</option>
+      <option value="rest">Resting state (eyes closed/open)</option>
+    </select></label>
+    <label>Participants in reference cohort<input id="nSub" type="number" min="20" max="2000" value="200"></label>
+    <label>Trials per participant<input id="nTri" type="number" min="10" max="400" value="80"></label>
+    <label>Cross-validation folds<input id="nFold" type="number" min="2" max="10" value="5"></label>
+  </div>
+  <div class="seg"><button class="btn primary" id="runTrial" type="button">Run trial and evaluate accuracy</button></div>
+  <div class="scanwrap" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+    <div style="display:grid;gap:6px;min-width:0"><div class="small" id="erpTitle">Grand-average ERP</div><canvas id="erp" width="620" height="300" aria-label="Event-related potential plot"></canvas></div>
+    <div style="display:grid;gap:10px;min-width:0">
+      <div class="verdict">
+        <div class="cell"><span class="k">Accuracy</span><span class="v" id="mAcc">–</span></div>
+        <div class="cell"><span class="k">Sensitivity</span><span class="v" id="mSen">–</span></div>
+        <div class="cell"><span class="k">Specificity</span><span class="v" id="mSpe">–</span></div>
+        <div class="cell"><span class="k">AUC</span><span class="v" id="mAuc">–</span></div>
+      </div>
+      <div class="tblwrap"><table id="cmTbl"><thead><tr><th></th><th>Predicted healthy</th><th>Predicted at risk</th></tr></thead><tbody></tbody></table></div>
+      <div class="tblwrap"><table id="featTbl"><thead><tr><th>Feature</th><th>Healthy mean</th><th>At-risk mean</th><th>This patient</th></tr></thead><tbody></tbody></table></div>
+      <div class="cell"><span class="k">This patient's EEG trial result</span><span class="v" id="mPat">–</span><span class="small" id="mPatNote"></span></div>
+    </div>
+  </div>
+  <div class="small" id="trialNote"></div>
+</section>
+
+<div><button class="btn primary" id="run" type="button">Run fusion analysis</button></div>
+
+<section class="panel report" aria-labelledby="h-rep">
+  <h2 id="h-rep"><span class="step">5</span> Fusion report <span class="small" id="repId"></span></h2>
+  <div class="verdict">
+    <div class="cell"><span class="k">Problem present</span><span class="v" id="vPresent">–</span><span class="small" id="vProb"></span></div>
+    <div class="cell"><span class="k">Areas</span><span class="v" id="vAreas">–</span></div>
+    <div class="cell"><span class="k">Extent</span><span class="v" id="vExtent">–</span><span class="small" id="vExtentNote"></span></div>
+    <div class="cell"><span class="k">Severity</span><span class="v" id="vSev">–</span><span class="small" id="vSevScore"></span></div>
+  </div>
+  <div style="display:grid;gap:6px">
+    <div class="small">Contribution of each source to the severity score</div>
+    <div id="contrib" style="display:grid;gap:6px"></div>
+  </div>
+  <div><div class="small">Findings</div><ul class="find" id="findings"></ul></div>
+  <div class="small" id="confNote"></div>
+</section>
+
+<section class="panel" aria-labelledby="h-obj">
+  <h2 id="h-obj">How this serves the Aarhus postdoc objectives</h2>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Objective in the advert (Prof. Thomsen, Centre for Alcohol and Drug Research)</th><th>What this lab adds</th></tr></thead>
+    <tbody>
+      <tr><td>Analyse the large RCT of a neurodevelopmentally informed prevention programme for adolescents (ADAPT, cluster-randomised, about 1,000 pupils aged 13–15)</td><td>Pre-specified outcome pipeline for ADAPT's questionnaire outcomes, with class-aware models and small-sample corrections. ADAPT itself collects survey data only; EEG and imaging apply to studies that add them.</td></tr>
+      <tr><td>Find who benefits from the intervention</td><td>Pre-specified moderators (sex, baseline drinking, well-being) tested on held-out classes; brain markers (No-Go P3, cue LPP, frontal theta) only where a study collects them</td></tr>
+      <tr><td>Risk and protective factors in large adolescent datasets</td><td>Normative deviation scores and a validated classifier with honest accuracy, sensitivity, specificity and AUC</td></tr>
+      <tr><td>Big data analytics and clear communication</td><td>One report that states presence, areas, extent and severity, with each source's contribution and its uncertainty</td></tr>
+    </tbody></table></div>
+</section>
+
+<section class="panel" aria-labelledby="h-plan">
+  <h2 id="h-plan">Research plan: phases and expected outputs (Feb 2027 – Jan 2029)</h2>
+  <p class="small">Same schedule as research plan v03 (PDF). Months count from the start on 1 February 2027.</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Phase</th><th>Months</th><th>Main work</th><th>Expected output (month)</th><th>Advert objective</th></tr></thead>
+    <tbody>
+      <tr><td>P0 Onboarding and analysis plan</td><td>1–3</td><td>Protocol, measures and data dictionary; pipeline in AU's secure environment; statistical analysis plan with the team</td><td>SAP deposited (M2); pipeline v1 (M3)</td><td>Analytics plans</td></tr>
+      <tr><td>WP1 Main outcome analysis</td><td>3–8</td><td>ITT effect at 3 months with GEE, small-sample corrected; attrition sensitivity (IPW, multilevel imputation, tipping point); feasibility</td><td>Main outcome paper (M8); ICCs for all outcomes (M9)</td><td>Analyse the large RCT</td></tr>
+      <tr><td>WP2 Who benefits and how</td><td>6–15</td><td>Pre-specified moderators; causal forest split by class; mediation through well-being; attendance dose</td><td>Moderators and mechanisms paper (M15)</td><td>Analyse the large RCT</td></tr>
+      <tr><td>WP3 Fidelity and text data</td><td>8–18</td><td>Classifiers for session fidelity from audio transcripts, checked against human coders; open-answer topics</td><td>Fidelity methods paper (M18)</td><td>Big data analytics</td></tr>
+      <tr><td>WP4 Risk and protective factors</td><td>10–24</td><td>Drinking and well-being trajectories; leakage-free prediction validated by school or cohort; fairness by sex and SES</td><td>Trajectories paper (M20); prediction paper (M24)</td><td>Risk and protective factors in large data sets</td></tr>
+      <tr><td>Infrastructure and dissemination</td><td>1–24</td><td>Version-controlled pipeline and methods guide; annual international conference</td><td>KBS 2027 (M5), KBS 2028 (M17); pipeline release (M24)</td><td>Communication; team collaboration</td></tr>
+    </tbody></table></div>
+</section>
+
+<section class="panel" aria-labelledby="h-ideas">
+  <h2 id="h-ideas">Ideas to improve detection beyond current practice</h2>
+  <ul class="find">
+    <li><strong>Normative modelling instead of case–control cut-offs.</strong> Score each pupil against age- and sex-specific reference curves, so severity is a distance from the healthy norm (Marquand et al., 2016).</li>
+    <li><strong>Low-cost EEG in schools.</strong> Four-channel consumer headsets (Muse) recorded in class; channel-agnostic features let models trained on 16–64-channel lab EEG transfer to them.</li>
+    <li><strong>Deep learning on raw EEG with leakage-free validation.</strong> Compact networks such as EEGNet, with splits by pupil and by class, never by trial.</li>
+    <li><strong>Learned multimodal fusion with calibration.</strong> Replace fixed weights with stacking that is calibrated and can abstain, so uncertain cases go to a clinician.</li>
+    <li><strong>State tracking over time.</strong> A particle filter or hidden Markov model follows each pupil's risk state across follow-up waves, rather than a single snapshot.</li>
+    <li><strong>Who benefits.</strong> Causal forests estimate individual treatment effects of ADAPT from baseline markers, with replication on held-out classes (Wager and Athey, 2018).</li>
+    <li><strong>Objective alcohol markers.</strong> PEth from dried blood spots as a check on self-reported drinking.</li>
+    <li><strong>Fairness checks.</strong> Accuracy reported separately by sex and socio-economic group.</li>
+  </ul>
+</section>
+
+<section class="panel" aria-labelledby="h-ref">
+  <h2 id="h-ref">References</h2>
+  <ul class="find small">
+    <li><strong>Trial:</strong> Prevention of alcohol use and promotion of well-being among middle school students: study protocol for a randomized controlled trial of ADAPT. BMC Public Health 2025;25:3840. doi:10.1186/s12889-025-25037-5. Registry NCT07132866.</li>
+    <li><strong>EEG/ERP and alcohol risk:</strong> Begleiter H, Porjesz B, Bihari B, Kissin B. Event-related brain potentials in boys at risk for alcoholism. Science 1984;225:1493–1496.</li>
+    <li>Polich J, Pollock VE, Bloom FE. Meta-analysis of P300 amplitude from males at risk for alcoholism. Psychol Bull 1994;115:55–73.</li>
+    <li>Porjesz B, Rangaswamy M, Kamarajan C, et al. The utility of neurophysiological markers in the study of alcoholism. Clin Neurophysiol 2005;116:993–1018.</li>
+    <li><strong>fMRI and the adolescent brain:</strong> Feldstein Ewing SW, Sakhardande A, Blakemore SJ. The effect of alcohol consumption on the adolescent brain: a systematic review of MRI and fMRI studies. NeuroImage: Clinical 2014;5:420–437.</li>
+    <li>Schacht JP, Anton RF, Myrick H. Functional neuroimaging studies of alcohol cue reactivity: a quantitative meta-analysis and systematic review. Addict Biol 2013;18:121–133.</li>
+    <li>Whelan R, Watts R, Orr CA, et al. Neuropsychosocial profiles of current and future adolescent alcohol misusers. Nature 2014;512:185–189 (IMAGEN).</li>
+    <li>Volkow ND, Koob GF, Croyle RT, et al. The conception of the ABCD study. Dev Cogn Neurosci 2018;32:4–7.</li>
+    <li><strong>Blood markers:</strong> Conigrave KM, Davies P, Haber P, Whitfield JB. Traditional markers of excessive alcohol use. Addiction 2003;98(Suppl 2):31–43.</li>
+    <li>Viel G, Boscolo-Berto R, Cecchetto G, et al. Phosphatidylethanol in blood as a marker of chronic alcohol use: a systematic review and meta-analysis. Int J Mol Sci 2012;13:14788–14812.</li>
+    <li><strong>Data and methods:</strong> Obeid I, Picone J. The Temple University Hospital EEG data corpus. Front Neurosci 2016;10:196.</li>
+    <li>Gramfort A, et al. MEG and EEG data analysis with MNE-Python. Front Neurosci 2013;7:267.</li>
+    <li>Esteban O, et al. fMRIPrep: a robust preprocessing pipeline for functional MRI. Nat Methods 2019;16:111–116.</li>
+    <li>Lawhern VJ, et al. EEGNet: a compact convolutional neural network for EEG-based brain–computer interfaces. J Neural Eng 2018;15:056013.</li>
+    <li>Marquand AF, Rezek I, Buitelaar J, Beckmann CF. Understanding heterogeneity in clinical cohorts using normative models. Biol Psychiatry 2016;80:552–561.</li>
+    <li>Wager S, Athey S. Estimation and inference of heterogeneous treatment effects using random forests. J Am Stat Assoc 2018;113:1228–1242.</li>
+  </ul>
+</section>
+
+<section class="panel" aria-labelledby="h-res">
+  <h2 id="h-res">Data and tools for building the real system</h2>
+  <div class="res">
+    <div><strong>EEG data</strong><br><a href="https://isip.piconepress.com/projects/tuh_eeg/" target="_blank" rel="noopener">TUH EEG Corpus</a> (normal/abnormal, seizures); <a href="https://physionet.org/content/chbmit/1.0.0/" target="_blank" rel="noopener">CHB-MIT</a></div>
+    <div><strong>fMRI data</strong><br><a href="https://openneuro.org/" target="_blank" rel="noopener">OpenNeuro</a>; <a href="https://abcdstudy.org/" target="_blank" rel="noopener">ABCD Study</a> (adolescents, substance use); <a href="https://imagen-project.org/" target="_blank" rel="noopener">IMAGEN</a></div>
+    <div><strong>Processing</strong><br><a href="https://mne.tools/" target="_blank" rel="noopener">MNE-Python</a> (EEG); <a href="https://fmriprep.org/" target="_blank" rel="noopener">fMRIPrep</a> and <a href="https://nilearn.github.io/" target="_blank" rel="noopener">Nilearn</a> (fMRI)</div>
+    <div><strong>Normative models</strong><br><a href="https://pcntoolkit.readthedocs.io/" target="_blank" rel="noopener">PCNtoolkit</a> for deviation from a healthy reference; atlas regions from Harvard-Oxford</div>
+  </div>
+</section>
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let mriCase='mild', eegCase='mild', seed=7;
+function rng(){seed=(seed*16807)%2147483647;return (seed-1)/2147483646;}
+function gauss(){let u=0,v=0;while(!u)u=rng();while(!v)v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+/* ---------- fMRI ---------- */
+const AREAS=[
+ {id:'PFC-L',name:'Prefrontal cortex L',x:.40,y:.22},{id:'PFC-R',name:'Prefrontal cortex R',x:.60,y:.22},
+ {id:'ACC',name:'Anterior cingulate',x:.50,y:.36},{id:'INS-L',name:'Insula L',x:.30,y:.47},
+ {id:'INS-R',name:'Insula R',x:.70,y:.47},{id:'STR',name:'Striatum (reward)',x:.43,y:.50},
+ {id:'AMY',name:'Amygdala / hippocampus',x:.36,y:.62},{id:'PAR',name:'Parietal cortex',x:.62,y:.70},
+ {id:'OCC',name:'Occipital cortex',x:.50,y:.86}];
+const MRI_CASES={
+ healthy:{},
+ mild:{'PFC-L':-2.6,'STR':2.5},
+ severe:{'PFC-L':-3.6,'PFC-R':-3.1,'ACC':-2.8,'STR':3.8,'AMY':3.2,'INS-R':2.7}
+};
+function mriZ(){const base=MRI_CASES[mriCase];return AREAS.map(a=>({...a,z:+((base[a.id]??0)+gauss()*0.45).toFixed(2)}));}
+let mriData=[];
+function drawMRI(){
+  mriData=mriZ();
+  const c=$('#mri'),g=c.getContext('2d'),W=c.width,H=c.height;
+  g.fillStyle='#0b1016';g.fillRect(0,0,W,H);
+  // skull + brain
+  g.save();g.translate(W/2,H/2);
+  g.fillStyle='#3a4148';g.beginPath();g.ellipse(0,0,W*.40,H*.46,0,0,Math.PI*2);g.fill();
+  g.fillStyle='#8d949a';g.beginPath();g.ellipse(0,0,W*.37,H*.43,0,0,Math.PI*2);g.fill();
+  // gyri texture
+  const s0=seed;seed=99;
+  for(let i=0;i<900;i++){const a=rng()*Math.PI*2,r=Math.sqrt(rng());const x=Math.cos(a)*r*W*.35,y=Math.sin(a)*r*H*.41;
+    const t=rng();g.fillStyle=t<.5?'rgba(205,210,214,.18)':'rgba(40,46,52,.22)';g.beginPath();g.ellipse(x,y,6+rng()*10,2+rng()*3,a,0,Math.PI*2);g.fill();}
+  seed=s0;
+  // midline + ventricles
+  g.strokeStyle='rgba(20,24,28,.7)';g.lineWidth=3;g.beginPath();g.moveTo(0,-H*.42);g.lineTo(0,H*.42);g.stroke();
+  g.fillStyle='#20262c';[-1,1].forEach(s=>{g.beginPath();g.ellipse(s*W*.045,-H*.02,W*.03,H*.11,s*.25,0,Math.PI*2);g.fill();});
+  g.restore();
+  // activation blobs
+  mriData.forEach(a=>{
+    if(Math.abs(a.z)<1.2)return;
+    const x=a.x*W,y=a.y*H,r=W*(.035+Math.min(Math.abs(a.z),4)*.014);
+    const grd=g.createRadialGradient(x,y,1,x,y,r);
+    if(a.z>0){grd.addColorStop(0,'rgba(255,230,90,.95)');grd.addColorStop(.5,'rgba(255,110,30,.75)');grd.addColorStop(1,'rgba(255,60,20,0)');}
+    else{grd.addColorStop(0,'rgba(120,220,255,.95)');grd.addColorStop(.5,'rgba(50,120,255,.75)');grd.addColorStop(1,'rgba(40,60,255,0)');}
+    g.fillStyle=grd;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill();
+  });
+  g.fillStyle='#cfd6dc';g.font='13px "IBM Plex Mono",monospace';g.fillText('A',W/2-4,18);g.fillText('P',W/2-4,H-8);g.fillText('L',8,H/2);g.fillText('R',W-16,H/2);
+  g.fillText(`z = ${({healthy:'normal',mild:'mild',severe:'severe'})[mriCase]} case · slice z=+12 mm`,10,H-10);
+  const tb=$('#mriTbl tbody');tb.innerHTML='';
+  mriData.forEach(a=>{const ab=Math.abs(a.z)>=2.3;tb.insertAdjacentHTML('beforeend',`<tr><td>${a.name}</td><td class="${ab?(Math.abs(a.z)>=3?'f-bad':'f-warn'):''}">${a.z>0?'+':''}${a.z.toFixed(1)}</td></tr>`);});
+}
+
+/* ---------- EEG (generic: dummy / file / live) ---------- */
+const MONTAGE={8:['Fp1','Fp2','F3','F4','T3','T4','O1','O2'],
+ 16:['Fp1','Fp2','F7','F3','F4','F8','T3','C3','C4','T4','T5','P3','P4','T6','O1','O2'],
+ 32:['Fp1','Fp2','AF3','AF4','F7','F3','Fz','F4','F8','FC5','FC1','FC2','FC6','T7','C3','Cz','C4','T8','CP5','CP1','CP2','CP6','P7','P3','Pz','P4','P8','PO3','PO4','O1','Oz','O2']};
+let DUMMY_CH=MONTAGE[16];
+const EEG_CASES={
+ healthy:{d:6,t:4,a:12,b:4,spike:0,focus:[]},
+ mild:{d:9,t:10,a:7,b:4,spike:0,focus:['F3','Fp1','AF3']},
+ severe:{d:16,t:14,a:4,b:3,spike:5,focus:['F3','F4','T3','T7','Fp1','AF3','F7']}
+};
+let src='dummy';
+let eegData={fs:256,ch:[],x:[],events:[],label:'dummy'};
+let eeg=[]; // per-channel summary {ch,x,spikes,bp}
+function genEEG(){
+  const cfg=EEG_CASES[eegCase],fs=256,N=fs*10;
+  const x=DUMMY_CH.map(ch=>{
+    const f=cfg.focus.includes(ch)?1.6:1;
+    const comps=[[2,cfg.d*f],[6,cfg.t*f],[10,cfg.a*(ch.startsWith('O')?1.5:0.7)],[20,cfg.b]];
+    const ph=comps.map(()=>rng()*Math.PI*2),jit=comps.map(()=>0.9+rng()*0.2);
+    const v=new Float32Array(N);
+    for(let i=0;i<N;i++){const t=i/fs;let s=0;comps.forEach(([fr,amp],k)=>{s+=amp*Math.sin(2*Math.PI*fr*jit[k]*t+ph[k]);});v[i]=s+gauss()*3;}
+    if(cfg.spike&&cfg.focus.includes(ch)){for(let s=0;s<cfg.spike;s++){const c=Math.floor(rng()*(N-60))+30;for(let k=-12;k<=24;k++){v[c+k]+=k<0?-60*Math.exp(-((k+6)**2)/8):90*Math.exp(-(k**2)/20)-30*Math.exp(-((k-14)**2)/30);}}}
+    return v;});
+  eegData={fs,ch:DUMMY_CH.slice(),x,events:[],label:'Dummy · '+eegCase};
+  summarise();
+}
+function spikeCount(x,fs){ // robust threshold on first difference
+  const d=[];for(let i=1;i<x.length;i++)d.push(Math.abs(x[i]-x[i-1]));
+  const s=d.slice().sort((p,q)=>p-q),med=s[Math.floor(s.length/2)]||1;
+  let n=0,last=-fs;for(let i=0;i<d.length;i++){if(d[i]>12*med&&i-last>fs*0.2){n++;last=i;}}return n;}
+function bandPower(x,fs){
+  const L=Math.min(x.length,fs*10),off=x.length-L,step=Math.max(1,Math.round(fs/128)),p={};
+  let mean=0;for(let i=off;i<x.length;i++)mean+=x[i];mean/=L||1;
+  for(let f=1;f<=30;f++){let re=0,im=0;for(let i=off;i<x.length;i+=step){const w=2*Math.PI*f*i/fs,v=x[i]-mean;re+=v*Math.cos(w);im+=v*Math.sin(w);}p[f]=re*re+im*im;}
+  const sum=(a,b)=>{let s=0;for(let f=a;f<=b;f++)s+=p[f];return s;};
+  const d=sum(1,3),t=sum(4,7),a=sum(8,12),b=sum(13,30),tot=(d+t+a+b)||1;
+  return {d:d/tot*100,t:t/tot*100,a:a/tot*100,b:b/tot*100,tb:t/(b||1e-9)};
+}
+function summarise(){
+  eeg=eegData.ch.map((ch,i)=>({ch,x:eegData.x[i],spikes:spikeCount(eegData.x[i],eegData.fs),bp:bandPower(eegData.x[i],eegData.fs)}));
+  $('#eegInfo').textContent=`· ${eegData.label} · ${eegData.ch.length} ch · ${eegData.fs} Hz · ${(eegData.x[0]?eegData.x[0].length/eegData.fs:0).toFixed(1)} s${eegData.events.length?` · ${eegData.events.length} events`:''}`;
+}
+function drawEEG(){
+  const c=$('#eeg');c.height=Math.max(260,40+Math.max(eeg.length,1)*30);const g=c.getContext('2d'),W=c.width,H=c.height;
+  g.fillStyle='#0b1016';g.fillRect(0,0,W,H);
+  if(!eeg.length){g.fillStyle='#9fb3c4';g.font='14px "IBM Plex Mono",monospace';g.fillText('No EEG data yet',20,40);$('#eegTbl tbody').innerHTML='';return;}
+  const fs=eegData.fs,len=eeg[0].x.length,win=Math.min(len,fs*10),off=len-win,secs=win/fs;
+  const left=52,rowH=(H-20)/eeg.length,focus=src==='dummy'?EEG_CASES[eegCase].focus:[];
+  g.strokeStyle='rgba(255,255,255,.06)';g.lineWidth=1;
+  for(let s=0;s<=Math.floor(secs);s++){const x=left+(W-left-8)*s/secs;g.beginPath();g.moveTo(x,0);g.lineTo(x,H-18);g.stroke();}
+  g.font='12px "IBM Plex Mono",monospace';
+  eeg.forEach((e,r)=>{
+    const y0=rowH*(r+.5),foc=focus.includes(e.ch);
+    let mean=0,sd=0;for(let i=off;i<len;i++)mean+=e.x[i];mean/=win;for(let i=off;i<len;i+=4)sd+=(e.x[i]-mean)**2;sd=Math.sqrt(sd/(win/4))||1;
+    const k=rowH/(sd*7);
+    g.fillStyle=foc?'#ffb347':'#9fb3c4';g.fillText(e.ch.slice(0,6),4,y0+4);
+    g.strokeStyle=foc?'#ffb347':'#7fd3ff';g.beginPath();
+    const st=Math.max(1,Math.floor(win/1600));
+    for(let i=0;i<win;i+=st){const x=left+(W-left-8)*i/win,y=y0-(e.x[off+i]-mean)*k;i?g.lineTo(x,y):g.moveTo(x,y);}
+    g.stroke();
+  });
+  g.fillStyle='#ffd166';eegData.events.forEach(ev=>{const i=ev.i-off;if(i<0||i>=win)return;const x=left+(W-left-8)*i/win;g.fillRect(x,0,1,H-18);});
+  g.fillStyle='#9fb3c4';for(let s=0;s<=Math.floor(secs);s+=2)g.fillText(s+'s',left+(W-left-8)*s/secs-6,H-4);
+  const tb=$('#eegTbl tbody');tb.innerHTML='';
+  eeg.forEach(e=>{const t=e.bp.tb,cls=t>4?'f-bad':t>2.5?'f-warn':'';
+    tb.insertAdjacentHTML('beforeend',`<tr><td>${e.ch}</td><td>${e.bp.d.toFixed(0)}</td><td>${e.bp.t.toFixed(0)}</td><td>${e.bp.a.toFixed(0)}</td><td>${e.bp.b.toFixed(0)}</td><td class="${cls}">${t.toFixed(1)}</td><td class="${e.spikes?'f-bad':''}">${e.spikes}</td></tr>`);});
+}
+
+/* ---------- Offline file ---------- */
+function parseEEGText(txt,fs){
+  const lines=txt.split(/\r?\n/).filter(l=>l.trim()&&!/^[%#]/.test(l.trim()));
+  const sep=lines[0].includes('\t')?'\t':lines[0].includes(';')?';':',';
+  let head=lines[0].split(sep).map(h=>h.trim());
+  const hasHead=head.some(h=>isNaN(parseFloat(h)));
+  if(!hasHead)head=head.map((_,i)=>'Ch'+(i+1));
+  const rows=lines.slice(hasHead?1:0).map(l=>l.split(sep));
+  const tIdx=head.findIndex(h=>/^(time|timestamp|t)$/i.test(h)), eIdx=head.findIndex(h=>/event|marker|trigger|stim/i.test(h));
+  const chIdx=head.map((h,i)=>i).filter(i=>i!==tIdx&&i!==eIdx&&rows.some(r=>!isNaN(parseFloat(r[i])))).slice(0,32);
+  if(!chIdx.length)throw new Error('No numeric channel columns found.');
+  if(tIdx>=0&&rows.length>2){const dt=parseFloat(rows[1][tIdx])-parseFloat(rows[0][tIdx]);if(dt>0){const f=dt<1?1/dt:1000/dt;if(f>20&&f<5000)fs=Math.round(f);}}
+  const x=chIdx.map(ci=>Float32Array.from(rows,r=>parseFloat(r[ci])||0));
+  const events=[];if(eIdx>=0)rows.forEach((r,i)=>{const v=(r[eIdx]||'').trim();if(v&&v!=='0')events.push({i,type:v});});
+  return {fs,ch:chIdx.map(i=>head[i]),x,events,label:'File'};
+}
+
+/* ---------- Live devices ---------- */
+let live=null;
+function liveSupported(kind){
+  if(kind==='bt')return !!(navigator.bluetooth);
+  return !!(navigator.serial);
+}
+function liveBlockedMsg(){
+  $('#liveMsg').innerHTML='This viewer blocks Bluetooth and USB access. To stream from a headset, save this page as an .html file and open it locally in Chrome or Edge (for example run <code>python -m http.server</code> in its folder and open http://localhost:8000). Until then, use a recorded file or dummy data.';
+}
+function startLiveBuffer(chNames,fs,label){
+  eegData={fs,ch:chNames,x:chNames.map(()=>new Float32Array(fs*10)),events:[],label};
+  live={buf:chNames.map(()=>[]),fs,timer:setInterval(()=>{
+    eegData.x=eegData.x.map((arr,i)=>{const add=live.buf[i].splice(0);if(!add.length)return arr;const n=arr.length,out=new Float32Array(n);const keep=Math.max(0,n-add.length);out.set(arr.subarray(n-keep),0);out.set(add.slice(-n),keep);return out;});
+    summarise();drawEEG();
+  },250)};
+}
+function stopLive(){if(!live)return;clearInterval(live.timer);try{live.stop&&live.stop();}catch(e){}live=null;$('#liveMsg').textContent='Stream stopped. The last 10 s stay on screen for analysis.';run();}
+async function connectMuse(){
+  if(!liveSupported('bt')){liveBlockedMsg();return;}
+  try{
+    const SVC=0xfe8d,CTRL='273e0001-4c4d-454d-96be-f03bac821358';
+    const CH={TP9:'273e0003-4c4d-454d-96be-f03bac821358',AF7:'273e0004-4c4d-454d-96be-f03bac821358',AF8:'273e0005-4c4d-454d-96be-f03bac821358',TP10:'273e0006-4c4d-454d-96be-f03bac821358'};
+    const dev=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}]});
+    $('#liveMsg').textContent='Connecting to '+(dev.name||'Muse')+'…';
+    const srv=await (await dev.gatt.connect()).getPrimaryService(SVC);
+    const names=Object.keys(CH);startLiveBuffer(names,256,'Live · '+(dev.name||'Muse'));
+    for(const [i,n] of names.entries()){const c=await srv.getCharacteristic(CH[n]);await c.startNotifications();
+      c.addEventListener('characteristicvaluechanged',ev=>{const d=new Uint8Array(ev.target.value.buffer);const s=[];
+        for(let k=2;k+2<d.length;k+=3){s.push(0.48828125*(((d[k]<<4)|(d[k+1]>>4))-0x800));s.push(0.48828125*((((d[k+1]&0xf)<<8)|d[k+2])-0x800));}
+        live&&live.buf[i].push(...s);});}
+    const ctrl=await srv.getCharacteristic(CTRL);
+    const cmd=t=>{const e=new TextEncoder().encode('X'+t+'\n');e[0]=e.length-1;return ctrl.writeValue(e);};
+    await cmd('h');await cmd('p21');await cmd('s');await cmd('d');
+    live.stop=()=>{cmd('h').catch(()=>{});dev.gatt.disconnect();};
+    $('#liveMsg').textContent='Streaming from '+(dev.name||'Muse')+' (TP9, AF7, AF8, TP10 at 256 Hz).';
+  }catch(e){$('#liveMsg').textContent='Bluetooth connection failed: '+(e.message||e)+'. Check the headset is on and not paired to another app.';}
+}
+async function connectSerial(){
+  if(!liveSupported('serial')){liveBlockedMsg();return;}
+  try{
+    const port=await navigator.serial.requestPort();
+    await port.open({baudRate:parseInt($('#serBaud').value)||115200});
+    const fs=parseInt($('#serFs').value)||250;
+    const reader=port.readable.pipeThrough(new TextDecoderStream()).getReader();
+    let rest='',started=false;
+    live={stop:async()=>{try{await reader.cancel();await port.close();}catch(e){}}};
+    $('#liveMsg').textContent='Port open. Waiting for lines of comma-separated channel values…';
+    (async()=>{while(true){const {value,done}=await reader.read();if(done)break;rest+=value;const ls=rest.split(/\r?\n/);rest=ls.pop();
+      for(const l of ls){const v=l.split(/[,;\s]+/).map(parseFloat).filter(n=>!isNaN(n));if(!v.length)continue;
+        if(!started){const stop=live.stop;startLiveBuffer(v.map((_,i)=>'Ch'+(i+1)),fs,'Live · serial');live.stop=stop;started=true;$('#liveMsg').textContent=`Streaming ${v.length} channels at ${fs} Hz.`;}
+        v.forEach((n,i)=>live&&live.buf[i]&&live.buf[i].push(n));}}})();
+  }catch(e){$('#liveMsg').textContent='Serial connection failed: '+(e.message||e);}
+}
+
+/* ---------- Trial assessment ---------- */
+const PARADIGMS={
+ oddball:{title:'Auditory oddball: standard vs target tones, Pz',conds:['Standard','Target'],
+   feats:[['P300 amplitude (µV)',9.0,6.2,2.2],['P300 latency (ms)',330,365,30],['Theta/beta ratio',1.8,2.9,0.8]],
+   erp:(c,g)=>[[300,c?(g?6.2:9):1.2,90],[200,-2,40],[100,1.5,25]]},
+ gonogo:{title:'Go/No-Go: Go vs No-Go trials, FCz',conds:['Go','No-Go'],
+   feats:[['No-Go P3 amplitude (µV)',10.5,7.4,2.4],['No-Go N2 amplitude (µV)',-5.5,-3.8,1.6],['Commission errors (%)',9,18,6]],
+   erp:(c,g)=>[[340,c?(g?7.4:10.5):5,85],[240,c?(g?-3.8:-5.5):-2,35],[100,1.5,25]]},
+ cue:{title:'Cue reactivity: neutral vs alcohol images, Pz',conds:['Neutral','Alcohol'],
+   feats:[['LPP difference (µV)',1.2,3.6,1.5],['Craving rating (0–10)',1.5,4.2,1.8],['Frontal alpha asymmetry',0.02,0.11,0.07]],
+   erp:(c,g)=>[[600,c?(g?6.6:4.2):3,220],[300,4,70],[170,-2,30]]},
+ rest:{title:'Resting state: alpha power, eyes closed vs open, O1/O2',conds:['Eyes open','Eyes closed'],
+   feats:[['Alpha reactivity (ratio)',2.3,1.6,0.5],['Theta/beta ratio',1.8,2.9,0.8],['Frontal theta power (%)',14,21,5]],
+   erp:null}
+};
+let model=null;
+function simCohort(pd,nSub,nTri){
+  const P=PARADIGMS[pd],X=[],y=[];
+  for(let s=0;s<nSub;s++){const g=rng()<0.5?1:0;y.push(g);
+    X.push(P.feats.map(([,h,r,sd])=>{const mu=g?r:h;let m=0;const k=Math.max(5,Math.round(nTri/4));for(let t=0;t<k;t++)m+=mu+gauss()*sd*2;return m/k+gauss()*sd*0.6;}));}
+  return {X,y};
+}
+function fitLR(X,y){
+  const d=X[0].length,mu=Array(d).fill(0),sd=Array(d).fill(0);
+  X.forEach(r=>r.forEach((v,j)=>mu[j]+=v/X.length));X.forEach(r=>r.forEach((v,j)=>sd[j]+=(v-mu[j])**2/X.length));
+  const s=sd.map(v=>Math.sqrt(v)||1),Z=X.map(r=>r.map((v,j)=>(v-mu[j])/s[j]));
+  let w=Array(d).fill(0),b=0;
+  for(let it=0;it<400;it++){const gw=Array(d).fill(0);let gb=0;
+    Z.forEach((z,i)=>{const p=1/(1+Math.exp(-(b+z.reduce((a,v,j)=>a+v*w[j],0))));const e=p-y[i];gb+=e;z.forEach((v,j)=>gw[j]+=e*v);});
+    w=w.map((v,j)=>v-0.3*(gw[j]/Z.length+0.01*v));b-=0.3*gb/Z.length;}
+  return {w,b,mu,s,predict:r=>1/(1+Math.exp(-(b+r.reduce((a,v,j)=>a+((v-mu[j])/s[j])*w[j],0))))};
+}
+function auc(scores,y){const pos=[],neg=[];scores.forEach((s,i)=>(y[i]?pos:neg).push(s));let c=0;pos.forEach(p=>neg.forEach(n=>{c+=p>n?1:p===n?0.5:0;}));return pos.length&&neg.length?c/(pos.length*neg.length):NaN;}
+function patientFeatures(pd){
+  const P=PARADIGMS[pd];
+  if(src==='dummy'){const lvl={healthy:0,mild:0.55,severe:1.15}[eegCase];return {f:P.feats.map(([,h,r,sd])=>h+(r-h)*lvl+gauss()*sd*0.3),note:'Features of the dummy patient for this paradigm.'};}
+  const tb=eeg.length?eeg.reduce((a,e)=>a+e.bp.tb,0)/eeg.length:NaN;
+  if(pd==='rest'&&eeg.length){const fr=eeg.filter(e=>/^F|Fp|AF/i.test(e.ch));const th=(fr.length?fr:eeg).reduce((a,e)=>a+e.bp.t,0)/((fr.length?fr:eeg).length);
+    const occ=eeg.filter(e=>/^O|TP/i.test(e.ch));const al=(occ.length?occ:eeg).reduce((a,e)=>a+e.bp.a,0)/((occ.length?occ:eeg).length);
+    return {f:[Math.max(1,al/12),tb,th],note:'Resting features computed from the loaded recording (alpha reactivity estimated from one condition).'};}
+  if(eegData.events.length>=10&&eeg.length){
+    const fs=eegData.fs,types=[...new Set(eegData.events.map(e=>e.type))],rare=types.sort((a,b)=>eegData.events.filter(e=>e.type===a).length-eegData.events.filter(e=>e.type===b).length)[0];
+    const ep=(type,t0,t1)=>{let s=0,n=0;eegData.events.filter(e=>e.type===type).forEach(e=>{const base=e.i;for(let i=Math.round(t0*fs/1000);i<Math.round(t1*fs/1000);i++){const k=base+i;if(k<eeg[0].x.length){s+=eeg.reduce((a,c)=>a+c.x[k],0)/eeg.length;n++;}}});return n?s/n:0;};
+    const amp=ep(rare,250,450)-ep(rare,-100,0);
+    return {f:[amp,PARADIGMS[pd].feats[1][1],tb],note:`ERP measured from ${eegData.events.filter(e=>e.type===rare).length} "${rare}" events in the recording; other features use cohort defaults.`};}
+  return {f:null,note:'This paradigm needs event markers (an "event" column) in the recording. Use Resting state, or load a file with events.'};
+}
+function drawERP(pd){
+  const c=$('#erp'),g=c.getContext('2d'),W=c.width,H=c.height,P=PARADIGMS[pd];
+  g.fillStyle='#0b1016';g.fillRect(0,0,W,H);g.font='12px "IBM Plex Mono",monospace';
+  $('#erpTitle').textContent=P.title;
+  if(!P.erp){ // resting: alpha spectrum bars
+    const bars=[['Healthy, eyes open',5],['Healthy, eyes closed',11.5],['At risk, eyes open',5.5],['At risk, eyes closed',8.8]];
+    bars.forEach(([n,v],i)=>{const x=40+i*(W-60)/4,h=v/13*(H-60);g.fillStyle=i<2?'#7fd3ff':'#ff8a5b';g.fillRect(x,H-30-h,(W-60)/4-24,h);g.fillStyle='#cfd6dc';g.fillText(n.split(',')[0],x,H-14);g.fillText(n.split(',')[1],x,H-2);});
+    g.fillStyle='#9fb3c4';g.fillText('Alpha power (µV²), group means',8,16);return;}
+  const t0=-100,t1=900,x=t=>40+(W-50)*(t-t0)/(t1-t0),y=v=>H/2-v*(H/2-24)/12;
+  g.strokeStyle='rgba(255,255,255,.12)';g.beginPath();g.moveTo(40,y(0));g.lineTo(W-10,y(0));g.moveTo(x(0),10);g.lineTo(x(0),H-20);g.stroke();
+  g.fillStyle='#9fb3c4';[0,200,400,600,800].forEach(t=>g.fillText(t+' ms',x(t)-14,H-6));g.fillText('+10 µV',2,y(10)+4);g.fillText('−10',8,y(-10)+4);
+  const curve=(cond,grp,col,dash)=>{g.strokeStyle=col;g.setLineDash(dash);g.lineWidth=2;g.beginPath();
+    for(let t=t0;t<=t1;t+=4){let v=0;if(t>0)P.erp(cond,grp).forEach(([lat,amp,wd])=>{v+=amp*Math.exp(-((t-lat)**2)/(2*wd*wd));});x(t)===x(t0)?g.moveTo(x(t),y(v)):g.lineTo(x(t),y(v));}
+    g.stroke();g.setLineDash([]);};
+  curve(0,0,'#7fd3ff',[6,4]);curve(1,0,'#7fd3ff',[]);curve(0,1,'#ff8a5b',[6,4]);curve(1,1,'#ff8a5b',[]);
+  g.fillStyle='#7fd3ff';g.fillText('Healthy',W-170,18);g.fillStyle='#ff8a5b';g.fillText('At risk',W-100,18);
+  g.fillStyle='#cfd6dc';g.fillText(`solid = ${P.conds[1]}, dashed = ${P.conds[0]}`,W-250,34);
+}
+function runTrial(){
+  const pd=$('#paradigm').value,nSub=Math.max(20,parseInt($('#nSub').value)||200),nTri=parseInt($('#nTri').value)||80,K=Math.min(10,Math.max(2,parseInt($('#nFold').value)||5));
+  const {X,y}=simCohort(pd,nSub,nTri);
+  const idx=X.map((_,i)=>i).sort(()=>rng()-0.5),scores=Array(X.length);
+  for(let k=0;k<K;k++){const te=idx.filter((_,i)=>i%K===k),tr=idx.filter((_,i)=>i%K!==k);
+    const m=fitLR(tr.map(i=>X[i]),tr.map(i=>y[i]));te.forEach(i=>scores[i]=m.predict(X[i]));}
+  let tp=0,tn=0,fp=0,fn=0;scores.forEach((s,i)=>{const p=s>=0.5;if(p&&y[i])tp++;else if(!p&&!y[i])tn++;else if(p)fp++;else fn++;});
+  const acc=(tp+tn)/X.length,sen=tp/(tp+fn||1),spe=tn/(tn+fp||1),A=auc(scores,y);
+  // bootstrap CI for accuracy
+  const bs=[];for(let r=0;r<300;r++){let c=0;for(let i=0;i<X.length;i++){const j=Math.floor(rng()*X.length);c+=((scores[j]>=0.5)===!!y[j])?1:0;}bs.push(c/X.length);}bs.sort((a,b)=>a-b);
+  $('#mAcc').textContent=(acc*100).toFixed(1)+'%';$('#mSen').textContent=(sen*100).toFixed(1)+'%';$('#mSpe').textContent=(spe*100).toFixed(1)+'%';$('#mAuc').textContent=A.toFixed(3);
+  $('#cmTbl tbody').innerHTML=`<tr><th>Actually healthy</th><td>${tn}</td><td>${fp}</td></tr><tr><th>Actually at risk</th><td>${fn}</td><td>${tp}</td></tr>`;
+  model=fitLR(X,y);model.pd=pd;
+  const P=PARADIGMS[pd],pf=patientFeatures(pd);
+  $('#featTbl tbody').innerHTML=P.feats.map(([n,h,r],j)=>`<tr><td>${n}</td><td>${h}</td><td>${r}</td><td>${pf.f&&isFinite(pf.f[j])?pf.f[j].toFixed(2):'–'}</td></tr>`).join('');
+  if(pf.f&&pf.f.every(isFinite)){const p=model.predict(pf.f);model.patient=p;
+    $('#mPat').textContent=p>=0.5?`At risk (${(p*100).toFixed(0)}%)`:`Healthy pattern (${(p*100).toFixed(0)}% risk)`;$('#mPat').className='v '+(p>=0.7?'f-bad':p>=0.5?'f-warn':'f-ok');}
+  else{model.patient=null;$('#mPat').textContent='Not available';$('#mPat').className='v';}
+  $('#mPatNote').textContent=pf.note;
+  $('#trialNote').textContent=`${nSub} simulated participants × ${nTri} trials, ${K}-fold cross-validation split by participant (no participant appears in both training and test). Accuracy 95% bootstrap interval ${(bs[7]*100).toFixed(1)}–${(bs[292]*100).toFixed(1)}%. Group effects follow published directions (for example smaller P300 and No-Go P3, larger alcohol-cue LPP in at-risk youth) with simulated sizes; a real accuracy needs labelled data such as ABCD or IMAGEN.`;
+  drawERP(pd);run();
+}
+/* ---------- Blood ---------- */
+const BLOOD=[
+ {id:'ggt',name:'GGT',unit:'U/L',lo:0,hi:55,val:78,link:'Heavy alcohol use, liver'},
+ {id:'mcv',name:'MCV',unit:'fL',lo:80,hi:98,val:99,link:'Chronic alcohol use'},
+ {id:'cdt',name:'CDT',unit:'%',lo:0,hi:1.7,val:2.1,link:'Recent heavy drinking'},
+ {id:'peth',name:'PEth',unit:'µmol/L',lo:0,hi:0.05,val:0.18,link:'Alcohol intake, 2–4 weeks'},
+ {id:'crp',name:'hs-CRP',unit:'mg/L',lo:0,hi:3,val:2.4,link:'Inflammation'},
+ {id:'cort',name:'Cortisol (am)',unit:'nmol/L',lo:140,hi:690,val:520,link:'Stress axis'},
+ {id:'b12',name:'Vitamin B12',unit:'pmol/L',lo:150,hi:700,val:210,link:'Cognition, neuropathy'}
+];
+function buildBlood(){
+  const box=$('#bloodIn');box.innerHTML='';
+  BLOOD.forEach(b=>box.insertAdjacentHTML('beforeend',`<label>${b.name} (${b.unit})<input id="bl-${b.id}" type="number" step="any" value="${b.val}"></label>`));
+  box.querySelectorAll('input').forEach(i=>i.addEventListener('input',renderBlood));
+  renderBlood();
+}
+function bloodFlags(){return BLOOD.map(b=>{const v=parseFloat($('#bl-'+b.id).value);const out=v>b.hi?(v-b.hi)/(b.hi-b.lo||1):v<b.lo?(b.lo-v)/(b.hi-b.lo||1):0;
+  const fl=out===0?'ok':out<0.35?'warn':'bad';return {...b,v,out,fl};});}
+function renderBlood(){const tb=$('#bloodTbl tbody');tb.innerHTML='';bloodFlags().forEach(b=>{
+  const lab={ok:'normal',warn:'raised',bad:'high'}[b.fl];
+  tb.insertAdjacentHTML('beforeend',`<tr><td>${b.name}</td><td>${isNaN(b.v)?'–':b.v}</td><td>${b.lo}–${b.hi} ${b.unit}</td><td><span class="flag f-${b.fl}">${b.v<b.lo&&b.fl!=='ok'?'low':lab}</span></td><td>${b.link}</td></tr>`);});}
+
+/* ---------- Doctor traits ---------- */
+const TRAITS=[['binge','Binge drinking'],['blackout','Blackouts'],['low mood','Low mood'],['concentration','Poor concentration'],['impulsiv','Impulsivity'],['anxi','Anxiety'],['seizure','Seizure'],['sleep','Sleep problems'],['head injur','Head injury']];
+function traits(){const t=$('#notes').value.toLowerCase();return TRAITS.filter(([k])=>t.includes(k)&&!(k==='seizure'&&/no seizure/.test(t))).map(x=>x[1]);}
+function renderTraits(){$('#traits').innerHTML=traits().map(t=>`<span class="chip">${t}</span>`).join('')||'<span class="small">none</span>';}
+
+/* ---------- Fusion ---------- */
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function run(){
+  const num=id=>parseFloat($(id).value)||0;
+  // clinical 0..1
+  const clin=clamp((num('#audit')/40)*0.4+(num('#phq')/27)*0.25+(num('#gad')/21)*0.15+((num('#bis')-30)/90)*0.2,0,1);
+  const tr=traits();
+  // fMRI
+  const abn=mriData.filter(a=>Math.abs(a.z)>=2.3);
+  const mriS=clamp(abn.reduce((s,a)=>s+Math.abs(a.z)-2,0)/8,0,1);
+  // EEG
+  const tbMean=eeg.length?eeg.reduce((s,e)=>s+e.bp.tb,0)/eeg.length:0, spikes=eeg.reduce((s,e)=>s+e.spikes,0);
+  const eegAbn=eeg.filter(e=>e.bp.tb>2.5||e.spikes);
+  let eegS=clamp((tbMean-1.5)/4+spikes*0.05,0,1);
+  if(model&&model.patient!=null)eegS=clamp(0.5*eegS+0.5*model.patient,0,1);
+  // blood
+  const bf=bloodFlags(); const bloodS=clamp(bf.reduce((s,b)=>s+Math.min(b.out,1),0)/3,0,1);
+  const W={clin:.30,mri:.30,eeg:.25,blood:.15};
+  const sev=W.clin*clin+W.mri*mriS+W.eeg*eegS+W.blood*bloodS;
+  const prob=1/(1+Math.exp(-(sev*10-3.2)));
+  const present=prob>=0.5;
+  // regions
+  const eegRegion=ch=>/^(Fp1|AF7|F3|F7)$/i.test(ch)?'Prefrontal cortex L':/^(Fp2|AF8|F4|F8)$/i.test(ch)?'Prefrontal cortex R':/^(T3|T7|TP9)$/i.test(ch)?'Temporal / amygdala L':/^(T4|T8|TP10)$/i.test(ch)?'Temporal R':/^O/i.test(ch)?'Occipital cortex':/^P/i.test(ch)?'Parietal cortex':/^C/i.test(ch)?'Central cortex':'EEG channel '+ch;
+  const regions=new Set(abn.map(a=>a.name));
+  eegAbn.forEach(e=>regions.add(eegRegion(e.ch)));
+  const lobes=new Set([...regions].map(r=>r.split(' ')[0]));
+  const extent=regions.size===0?'None':lobes.size<=1?'Focal (one area)':lobes.size<=3?'Multifocal':'Network-wide';
+  const grade=sev<0.25?'None':sev<0.45?'Mild':sev<0.65?'Moderate':'Severe';
+  $('#repId').textContent=`· ${$('#pid').value} · ${new Date().toLocaleDateString()}`;
+  $('#vPresent').textContent=present?'Yes':'No';$('#vPresent').className='v '+(present?'f-bad':'f-ok');
+  $('#vProb').textContent=`probability ${(prob*100).toFixed(0)}%`;
+  $('#vAreas').textContent=regions.size?`${regions.size} area${regions.size>1?'s':''}`:'None';
+  $('#vExtent').textContent=extent;$('#vExtentNote').textContent=`${lobes.size} brain region group${lobes.size===1?'':'s'}`;
+  $('#vSev').textContent=grade;$('#vSev').className='v '+({None:'f-ok',Mild:'f-warn',Moderate:'f-warn',Severe:'f-bad'})[grade];
+  $('#vSevScore').textContent=`score ${(sev*100).toFixed(0)} / 100`;
+  const parts=[['Doctor & scales',clin,W.clin],['fMRI',mriS,W.mri],['EEG',eegS,W.eeg],['Blood',bloodS,W.blood]];
+  $('#contrib').innerHTML=parts.map(([n,v,w])=>`<div class="contrib"><span>${n}</span><div class="bar"><span style="width:${(v*100).toFixed(0)}%"></span></div><span class="small">${(v*w*100).toFixed(0)}</span></div>`).join('');
+  const f=[];
+  if(tr.length)f.push(`Doctor's notes mention: ${tr.join(', ').toLowerCase()}.`);
+  f.push(`AUDIT ${num('#audit')} (${num('#audit')>=16?'harmful':num('#audit')>=8?'hazardous':'low-risk'} drinking range); PHQ-9 ${num('#phq')}; GAD-7 ${num('#gad')}.`);
+  abn.forEach(a=>f.push(`fMRI: ${a.name} ${a.z>0?'hyper':'hypo'}-activation (z = ${a.z.toFixed(1)}).`));
+  if(!abn.length)f.push('fMRI: no area beyond |z| 2.3.');
+  if(model&&model.patient!=null)f.push(`EEG trial (${PARADIGMS[model.pd].title.split(':')[0]}): classifier gives ${(model.patient*100).toFixed(0)}% probability of the at-risk pattern; cross-validated accuracy ${$('#mAcc').textContent}.`);
+  f.push(`EEG (${eegData.label}): mean theta/beta ratio ${tbMean.toFixed(1)}${spikes?`, ${spikes} spike-like discharges on ${eeg.filter(e=>e.spikes).map(e=>e.ch).join(', ')}`:''}${eegAbn.length?`; abnormal channels ${eegAbn.map(e=>e.ch).join(', ')}`:'; within normal range'}.`);
+  const hi=bf.filter(b=>b.fl!=='ok');
+  f.push(hi.length?`Blood: ${hi.map(b=>`${b.name} ${b.v} ${b.unit}`).join(', ')} outside reference.`:'Blood: all markers within reference.');
+  $('#findings').innerHTML=f.map(x=>`<li>${x}</li>`).join('');
+  const agree=[clin>.35,mriS>.2,eegS>.2,bloodS>.2].filter(Boolean).length;
+  $('#confNote').textContent=`Agreement: ${agree} of 4 sources point to a problem. ${agree<=2&&present?'Low agreement: refer to a clinician before acting.':'Result is for research review by a clinician.'} Weights: doctor 30%, fMRI 30%, EEG 25%, blood 15%.`;
+}
+
+/* ---------- wiring ---------- */
+document.querySelectorAll('[data-mri]').forEach(b=>b.addEventListener('click',()=>{mriCase=b.dataset.mri;document.querySelectorAll('[data-mri]').forEach(x=>x.setAttribute('aria-pressed',x===b));drawMRI();run();}));
+document.querySelectorAll('[data-eeg]').forEach(b=>b.addEventListener('click',()=>{eegCase=b.dataset.eeg;document.querySelectorAll('[data-eeg]').forEach(x=>x.setAttribute('aria-pressed',x===b));genEEG();drawEEG();if(model)runTrial();else run();}));
+document.querySelectorAll('[data-src]').forEach(b=>b.addEventListener('click',()=>{src=b.dataset.src;document.querySelectorAll('[data-src]').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  $('#srcDummy').hidden=src!=='dummy';$('#srcFile').hidden=src!=='file';$('#srcLive').hidden=src!=='live';
+  if(src!=='live'&&live)stopLive();
+  if(src==='dummy'){genEEG();drawEEG();run();}
+  if(src==='live'&&!liveSupported('bt')&&!liveSupported('serial'))liveBlockedMsg();}));
+$('#nCh').addEventListener('change',()=>{DUMMY_CH=MONTAGE[$('#nCh').value];genEEG();drawEEG();run();});
+$('#regen').addEventListener('click',()=>{seed=Math.floor(Math.random()*1e6)+1;genEEG();drawEEG();run();});
+$('#eegFile').addEventListener('change',async ev=>{const f=ev.target.files[0];if(!f)return;
+  try{const d=parseEEGText(await f.text(),parseInt($('#fileFs').value)||256);d.label='File · '+f.name;eegData=d;summarise();drawEEG();
+    $('#fileMsg').textContent=`Loaded ${d.ch.length} channels (${d.ch.join(', ')}), ${(d.x[0].length/d.fs).toFixed(1)} s at ${d.fs} Hz, ${d.events.length} event markers.`;
+    if(model)runTrial();else run();}
+  catch(e){$('#fileMsg').textContent='Could not read this file: '+e.message+' Expected a CSV with one numeric column per channel.';}});
+$('#btMuse').addEventListener('click',connectMuse);
+$('#btSerial').addEventListener('click',connectSerial);
+$('#btStop').addEventListener('click',stopLive);
+$('#runTrial').addEventListener('click',runTrial);
+$('#paradigm').addEventListener('change',runTrial);
+$('#notes').addEventListener('input',renderTraits);
+$('#run').addEventListener('click',run);
+buildBlood();renderTraits();drawMRI();genEEG();drawEEG();runTrial();
+})();
+</script>
+
+</body>
+</html>
